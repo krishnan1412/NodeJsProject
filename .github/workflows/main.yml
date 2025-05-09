@@ -1,4 +1,4 @@
-name: NodeJS CI/CD
+name: Deploy Node.js with PM2 & Apache2
 
 on: 
   push:
@@ -7,13 +7,14 @@ on:
   pull_request:
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install NodeJs
+      - name: Install Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -21,5 +22,25 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Run tests
-        run: npm start
+      - name: Install PM2
+        run: npm install pm2 -g
+
+      - name: Start application with PM2
+        run: pm2 start server.js --name my-node-app
+
+      - name: Install Apache2
+        run: sudo apt update && sudo apt install apache2 -y
+
+      - name: Configure Apache as a Reverse Proxy
+        run: |
+          sudo a2enmod proxy proxy_http
+          echo '<VirtualHost *:80>
+            ServerName mydomain.com
+            ProxyPass / http://localhost:3000/
+            ProxyPassReverse / http://localhost:3000/
+          </VirtualHost>' | sudo tee /etc/apache2/sites-available/nodejs.conf
+          sudo a2ensite nodejs.conf
+          sudo systemctl restart apache2
+
+      - name: Save PM2 process for auto-restart
+        run: pm2 save
